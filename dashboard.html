@@ -247,10 +247,14 @@ $('channelForm').addEventListener('submit',async e=>{
   return;
  }
 
- message.textContent=editingId?'تم تحديث القناة':'تمت إضافة القناة كمسودة';
+ const wasEditing = !!editingId;
 
- resetForm();
- await loadData();
+resetForm();
+await loadData();
+
+message.textContent = wasEditing
+ ? 'تم تحديث القناة بنجاح'
+ : 'تمت إضافة القناة كمسودة بنجاح. اضغط نشر لتظهر في التطبيق.';
 });
 
 async function togglePublish(c){
