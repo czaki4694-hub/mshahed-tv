@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>إدارة المباريات - مشاهد TV</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{background:#101827;color:white;font-family:Arial;padding:20px}
+main{max-width:600px;margin:auto}
+input,button{box-sizing:border-box;width:100%;padding:13px;margin:7px 0;border:0;border-radius:9px}
+input{background:#243247;color:white}
+button{background:#ff8b35;color:#111;font-weight:bold}
+.match{background:#243247;padding:13px;margin:10px 0;border-radius:10px}
+.delete{background:#bd3838;color:white}
+</style>
+</head>
+<body>
+<main>
+<h2>⚽ إدارة المباريات</h2>
+<p>أضف المباريات إلى تطبيق مشاهد TV</p>
+
+<input id="home" placeholder="الفريق الأول">
+<input id="away" placeholder="الفريق الثاني">
+<input id="league" placeholder="البطولة">
+
+<label>موعد المباراة</label>
+<input id="date" type="datetime-local">
+
+<input id="stream" placeholder="رابط المشاهدة المرخّص">
+
+<button onclick="addMatch()">إضافة المباراة</button>
+
+<h3>المباريات المسجلة</h3>
+<div id="matches">جار التحميل...</div>
+</main>
+
+<script>
+const db = supabase.createClient(
+'https://irkjsubiecrbhladkdko.supabase.co',
+'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc'
+);
+
+async function checkAdmin(){
+ const {data:{user}}=await db.auth.getUser();
+
+ if(!user){
+  location.href='admin.html';
+  return false;
+ }
+
+ const {data}=await db.from('admin_users')
+ .select('user_id')
+ .eq('user_id',user.id)
+ .maybeSingle();
+
+ if(!data){
+  document.body.innerHTML='غير مصرح بالدخول';
+  return false;
+ }
+
+ return true;
+}
+
+async function addMatch(){
+ const home=document.getElementById('home').value.trim();
+ const away=document.getElementById('away').value.trim();
+ const date=document.getElementById('date').value;
+
+ if(!home||!away||!date){
+  alert('أدخل الفريقين والموعد');
+  return;
+ }
+
+ const {error}=await db.from('matches').insert({
+  home_team:home,
+  away_team:away,
+  competition:document.getElementById('league').value,
+  starts_at:new Date(date).toISOString(),
+  stream_url:document.getElementById('stream').value,
+  is_published:false
+ });
+
+ if(error){
+  alert(error.message);
+  return;
+ }
+
+ alert('تمت إضافة المباراة');
+ document.querySelectorAll('input').forEach(x=>x.value='');
+ loadMatches();
+}
+
+async function loadMatches(){
+ const box=document.getElementById('matches');
+
+ const {data,error}=await db.from('matches')
+ .select('*')
+ .order('starts_at',{ascending:true});
+
+ if(error){
+  box.textContent=error.message;
+  return;
+ }
+
+ box.innerHTML='';
+
+ (data||[]).forEach(m=>{
+  const div=document.createElement('div');
+  div.className='match';
+
+  const title=document.createElement('b');
+  title.textContent=(m.home_team||'')+' × '+(m.away_team||'');
+
+  const info=document.createElement('p');
+  info.textContent=(m.competition||'')+' — '+
+  (m.starts_at?new Date(m.starts_at).toLocaleString('ar'):'');
+
+  const status=document.createElement('p');
+  status.textContent=m.is_published?'منشورة':'مسودة';
+
+  const del=document.createElement('button');
+  del.className='delete';
+  del.textContent='حذف المباراة';
+  del.onclick=()=>deleteMatch(m.id);
+
+  div.append(title,info,status,del);
+  box.append(div);
+ });
+
+ if(!data?.length)box.textContent='لا توجد مباريات بعد';
+}
+
+async function deleteMatch(id){
+ if(!confirm('هل تريد حذف المباراة؟'))return;
+
+ const {error}=await db.from('matches').delete().eq('id',id);
+
+ if(error)alert(error.message);
+ else loadMatches();
+}
+
+checkAdmin().then(ok=>{
+ if(ok)loadMatches();
+});
+</script>
+</body>
+</html>
