@@ -16,10 +16,10 @@ main{max-width:850px;margin:25px auto;padding:15px}
 .card{text-align:center}
 .card strong{display:block;font-size:28px;color:#ff9d45}
 section{margin-top:20px}
-input,select,button{width:100%;padding:13px;margin:8px 0;border-radius:9px;font-size:15px}
-input,select{background:#081426;color:white;border:1px solid #40536b}
+input,button{width:100%;padding:13px;margin:8px 0;border-radius:9px;font-size:15px}
+input{background:#081426;color:white;border:1px solid #40536b}
 button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer}
-.item{padding:14px 0;border-bottom:1px solid #40536b}
+.item{padding:14px 0;border-bottom:1px solid #40536b;overflow-wrap:anywhere}
 .actions{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 .actions button{font-size:13px;padding:10px}
 .danger{background:#a83232;color:white}
@@ -40,7 +40,6 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 
 <div class="cards">
 <div class="card">القنوات<strong id="channelCount">0</strong></div>
-<div class="card">الدول<strong id="countryCount">0</strong></div>
 <div class="card">المباريات<strong id="matchCount">0</strong></div>
 </div>
 
@@ -48,11 +47,6 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 <h2 id="formTitle">إضافة قناة</h2>
 <form id="channelForm">
 <input id="channelName" placeholder="اسم القناة" required>
-
-<select id="countrySelect" required>
-<option value="">جارٍ تحميل الدول...</option>
-</select>
-
 <input id="logo" type="url" placeholder="رابط شعار القناة (اختياري)">
 <input id="stream" type="url" placeholder="رابط البث المرخّص">
 <input id="category" placeholder="التصنيف">
@@ -87,7 +81,6 @@ import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 import Hls from 'https://esm.sh/hls.js@1.5.17';
 
 const SUPABASE_URL='https://irkjsubiecrbhladkdko.supabase.co';
-
 const SUPABASE_KEY='sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc';
 
 const supabase=createClient(SUPABASE_URL,SUPABASE_KEY);
@@ -103,7 +96,6 @@ let hls=null;
 async function checkAdmin(){
  try{
   const {data,error}=await supabase.auth.getUser();
-
   if(error)throw error;
 
   const user=data.user;
@@ -127,50 +119,14 @@ async function checkAdmin(){
   }
 
   return true;
-
  }catch(error){
   message.textContent='خطأ التحقق من الحساب: '+error.message;
   return false;
  }
 }
 
-async function loadCountries(){
- const select=$('countrySelect');
- select.replaceChildren(new Option('جارٍ تحميل الدول...',''));
-
- const {data,error}=await supabase
-  .from('countries')
-  .select('id,name')
-  .order('name');
-
- if(error){
-  select.replaceChildren(new Option('تعذر تحميل الدول',''));
-  $('countryCount').textContent='!';
-  message.textContent='خطأ تحميل الدول: '+error.message;
-  return false;
- }
-
- if(!data || data.length===0){
-  select.replaceChildren(new Option('لا توجد دول',''));
-  $('countryCount').textContent='0';
-  message.textContent='لم يتم العثور على دول في قاعدة البيانات.';
-  return false;
- }
-
- select.replaceChildren(new Option('اختر الدولة',''));
-
- data.forEach(country=>{
-  select.add(new Option(country.name,country.id));
- });
-
- $('countryCount').textContent=data.length;
- return true;
-}
-
 async function loadData(){
  message.textContent='جارٍ تحميل البيانات...';
-
- const countriesOK=await loadCountries();
 
  const [channels,matches]=await Promise.all([
   supabase.from('channels').select('*').order('created_at',{ascending:false}),
@@ -235,16 +191,13 @@ async function loadData(){
   list.append(item);
  });
 
- if(countriesOK){
-  message.textContent='تم تحميل البيانات بنجاح';
- }
+ message.textContent='تم تحميل البيانات بنجاح';
 }
 
 function editChannel(c){
  editingId=c.id;
 
  $('channelName').value=c.name||'';
- $('countrySelect').value=c.country_id||'';
  $('logo').value=c.logo_url||'';
  $('stream').value=c.stream_url||'';
  $('category').value=c.category||'';
@@ -269,18 +222,11 @@ $('cancelEdit').onclick=resetForm;
 $('channelForm').addEventListener('submit',async e=>{
  e.preventDefault();
 
- const countryId=$('countrySelect').value;
-
- if(!countryId){
-  message.textContent='يرجى اختيار الدولة أولاً';
-  return;
- }
-
  message.textContent='جارٍ حفظ القناة...';
 
  const values={
   name:$('channelName').value.trim(),
-  country_id:countryId,
+  country_id:null,
   logo_url:$('logo').value.trim()||null,
   stream_url:$('stream').value.trim()||null,
   category:$('category').value.trim()||null
