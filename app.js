@@ -15,7 +15,6 @@ const channels = [
  {id:13,name:"France 24 عربي",country:"المغرب",category:"general",logo:"France 24",style:"blue",desc:"أخبار",stream:"https://www.france24.com/ar/live"}
 ];
 
-let selectedCountry = "المغرب";
 let selectedView = "all";
 let selectedFilter = "all";
 let hlsPlayer = null;
@@ -28,12 +27,30 @@ const search = document.getElementById("search");
 const count = document.getElementById("count");
 
 const titles = {
- all:"قنوات ",
- favorites:"قنواتك المفضلة · ",
- recent:"القنوات المضافة حديثاً · "
+ all:"كل القنوات",
+ favorites:"قنواتك المفضلة",
+ recent:"القنوات المضافة حديثاً"
 };
 
-// إنشاء زر ملء الشاشة
+// إخفاء قسم الدول
+document.querySelectorAll("[data-country]").forEach(button => {
+ const section = button.closest("section");
+ if (section) section.hidden = true;
+ else button.hidden = true;
+});
+
+// إخفاء العناصر المعروفة الخاصة بقائمة الدول
+[
+ "#countriesSection",
+ "#countrySection",
+ ".countries-section",
+ ".country-section",
+ ".countries-grid"
+].forEach(selector => {
+ document.querySelectorAll(selector).forEach(el => el.hidden = true);
+});
+
+// ملء الشاشة
 const videoPlayer = document.getElementById("videoPlayer");
 const fullscreenBtn = document.createElement("button");
 
@@ -60,7 +77,7 @@ fullscreenBtn.addEventListener("click", async () => {
 
 function render() {
  const q = search.value.trim().toLowerCase();
- let list = channels.filter(c => c.country === selectedCountry);
+ let list = [...channels];
 
  if (selectedView === "favorites")
   list = list.filter(c => favorites.includes(c.id));
@@ -79,8 +96,10 @@ function render() {
  count.textContent = list.length;
 
  document.getElementById("sectionTitle").childNodes[0].textContent =
-  (titles[selectedView] || "قنوات ") +
-  (selectedView === "all" ? selectedCountry : "");
+  titles[selectedView] || "كل القنوات";
+
+ const crumb = document.getElementById("crumb");
+ if (crumb) crumb.textContent = "كل القنوات";
 
  grid.innerHTML = "";
 
@@ -163,7 +182,6 @@ function openPlayer(c) {
  if (url.includes(".m3u8")) {
   if (window.Hls && Hls.isSupported()) {
    hlsPlayer = new Hls();
-
    hlsPlayer.loadSource(url);
    hlsPlayer.attachMedia(video);
 
@@ -251,6 +269,7 @@ document.addEventListener("keydown", e => {
  if (e.key === "Escape") closePlayer();
 });
 
+// القائمة الرئيسية
 document.querySelectorAll("[data-view]").forEach(b => {
  b.addEventListener("click", () => {
   selectedView = b.dataset.view;
@@ -263,24 +282,7 @@ document.querySelectorAll("[data-view]").forEach(b => {
  });
 });
 
-document.querySelectorAll("[data-country]").forEach(b => {
- b.addEventListener("click", () => {
-  selectedCountry = b.dataset.country;
-  selectedView = "all";
-
-  document.querySelectorAll("[data-country]").forEach(x =>
-   x.classList.toggle("active", x === b)
-  );
-
-  document.querySelectorAll("[data-view]").forEach(x =>
-   x.classList.toggle("active", x.dataset.view === "all")
-  );
-
-  document.getElementById("crumb").textContent = selectedCountry;
-  render();
- });
-});
-
+// فلاتر القنوات
 document.querySelectorAll("[data-filter]").forEach(b => {
  b.addEventListener("click", () => {
   selectedFilter = b.dataset.filter;
@@ -333,15 +335,32 @@ async function loadPublishedChannels() {
   const rows = await response.json();
 
   rows.forEach(row => {
-   const dbId = "db-" + row.id;
+   const name = (row.name || "").trim().toLowerCase();
 
-   if (channels.some(c => c.id === dbId)) return;
+   // منع تكرار القناة إذا كانت موجودة مسبقاً
+   const existing = channels.find(c =>
+    c.name.trim().toLowerCase() === name
+   );
+
+   if (existing) {
+    if (row.stream_url) existing.stream = row.stream_url;
+    if (row.logo_url) existing.logo = row.logo_url;
+    return;
+   }
+
+   const categoryText = (row.category || "").toLowerCase();
+
+   let category = "general";
+   if (categoryText.includes("رياض") || categoryText.includes("sport"))
+    category = "sports";
+   else if (categoryText.includes("ثقاف") || categoryText.includes("culture"))
+    category = "culture";
 
    channels.push({
-    id: dbId,
+    id: "db-" + row.id,
     name: row.name,
     country: "المغرب",
-    category: "general",
+    category,
     logo: row.logo_url || row.name,
     style: "blue",
     desc: row.category || "قناة عامة",
