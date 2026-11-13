@@ -24,18 +24,20 @@ button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer
 .actions button{font-size:13px;padding:10px}
 .danger{background:#a83232;color:white}
 .secondary{background:#40536b;color:white}
-#message{color:#ffbd75;white-space:pre-wrap}
+#message{color:#ffbd75;white-space:pre-wrap;line-height:1.7}
 video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 .hidden{display:none}
 </style>
 </head>
 <body>
+
 <header>
 <h1>مِشاهِد TV</h1>
 <p>لوحة الإدارة والتحكم</p>
 </header>
 
 <main>
+
 <div class="cards">
 <div class="card">القنوات<strong id="channelCount">0</strong></div>
 <div class="card">الدول<strong id="countryCount">0</strong></div>
@@ -44,15 +46,19 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 
 <section>
 <h2 id="formTitle">إضافة قناة</h2>
+
 <form id="channelForm">
 <input id="channelName" placeholder="اسم القناة" required>
+
 <select id="countrySelect" required>
-<option value="">اختر الدولة</option>
+<option value="">جارٍ تحميل الدول...</option>
 </select>
+
 <input id="logo" type="url" placeholder="رابط شعار القناة (اختياري)">
 <input id="stream" type="url" placeholder="رابط البث المرخّص">
 <input id="category" placeholder="التصنيف">
-<button id="saveButton">حفظ القناة</button>
+
+<button id="saveButton" type="submit">حفظ القناة</button>
 <button type="button" class="secondary hidden" id="cancelEdit">إلغاء التعديل</button>
 </form>
 </section>
@@ -64,7 +70,7 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 
 <section>
 <h2>اختبار البث</h2>
-<p>أدخل رابط القناة أو اختر اختبار قناة من القائمة.</p>
+<p>اختر اختبار قناة من القائمة.</p>
 <video id="preview" controls playsinline></video>
 <button id="stopPreview" class="secondary">إيقاف الاختبار</button>
 </section>
@@ -74,6 +80,7 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 <button class="danger" id="logout">خروج من لوحة الإدارة</button>
 <p id="message"></p>
 </section>
+
 </main>
 
 <script type="module">
@@ -82,7 +89,7 @@ import Hls from 'https://esm.sh/hls.js@1.5.17';
 
 const supabase=createClient(
 'https://irkjsubiecrbhladkdko.supabase.co',
-'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc'
+'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_jkxFdjc'
 );
 
 const $=id=>document.getElementById(id);
@@ -94,93 +101,158 @@ let editingId=null;
 let hls=null;
 
 async function checkAdmin(){
- const {data:{user}}=await supabase.auth.getUser();
- if(!user){location.href='admin.html';return false}
- const {data,error}=await supabase.from('admin_users')
- .select('user_id').eq('user_id',user.id).maybeSingle();
- if(error||!data){
- await supabase.auth.signOut();
- location.href='admin.html';
- return false;
+ try{
+  const {data:{user},error:userError}=await supabase.auth.getUser();
+
+  if(userError) throw userError;
+
+  if(!user){
+   location.href='admin.html';
+   return false;
+  }
+
+  const {data,error}=await supabase
+   .from('admin_users')
+   .select('user_id')
+   .eq('user_id',user.id)
+   .maybeSingle();
+
+  if(error) throw error;
+
+  if(!data){
+   message.textContent='هذا الحساب ليس لديه صلاحية الإدارة';
+   await supabase.auth.signOut();
+   location.href='admin.html';
+   return false;
+  }
+
+  return true;
+ }catch(error){
+  message.textContent='خطأ في التحقق من الإدارة: '+error.message;
+  return false;
  }
+}
+
+async function loadCountries(){
+ const select=$('countrySelect');
+
+ select.replaceChildren(new Option('جارٍ تحميل الدول...',''));
+
+ const {data,error}=await supabase
+  .from('countries')
+  .select('id,name')
+  .order('name');
+
+ if(error){
+  select.replaceChildren(new Option('تعذر تحميل الدول',''));
+  $('countryCount').textContent='!';
+  message.textContent='خطأ تحميل الدول: '+error.message;
+  return false;
+ }
+
+ if(!data || data.length===0){
+  select.replaceChildren(new Option('لا توجد دول',''));
+  $('countryCount').textContent='0';
+  message.textContent='جدول الدول فارغ أو لا توجد صلاحية لقراءة البيانات.';
+  return false;
+ }
+
+ select.replaceChildren(new Option('اختر الدولة',''));
+
+ data.forEach(country=>{
+  select.add(new Option(country.name,country.id));
+ });
+
+ $('countryCount').textContent=data.length;
  return true;
 }
 
 async function loadData(){
- const [channels,countries,matches]=await Promise.all([
- supabase.from('channels').select('*').order('created_at',{ascending:false}),
- supabase.from('countries').select('*'),
- supabase.from('matches').select('*')
+ message.textContent='جارٍ تحميل البيانات...';
+
+ const countriesOK=await loadCountries();
+
+ const [channels,matches]=await Promise.all([
+  supabase.from('channels').select('*').order('created_at',{ascending:false}),
+  supabase.from('matches').select('*')
  ]);
 
- if(channels.error||countries.error||matches.error){
- message.textContent='تعذر تحميل البيانات: '+
- (channels.error||countries.error||matches.error).message;
- return;
+ if(channels.error){
+  message.textContent='خطأ تحميل القنوات: '+channels.error.message;
+  return;
+ }
+
+ if(matches.error){
+  message.textContent='خطأ تحميل المباريات: '+matches.error.message;
+  return;
  }
 
  $('channelCount').textContent=channels.data.length;
- $('countryCount').textContent=countries.data.length;
  $('matchCount').textContent=matches.data.length;
-
- const select=$('countrySelect');
- select.replaceChildren(new Option('اختر الدولة',''));
- countries.data.forEach(c=>{
- select.add(new Option(c.name,c.id));
- });
 
  list.replaceChildren();
 
+ if(channels.data.length===0){
+  list.textContent='لا توجد قنوات مسجلة بعد';
+ }
+
  channels.data.forEach(c=>{
- const item=document.createElement('div');
- item.className='item';
+  const item=document.createElement('div');
+  item.className='item';
 
- const title=document.createElement('strong');
- title.textContent=c.name;
+  const title=document.createElement('strong');
+  title.textContent=c.name;
 
- const status=document.createElement('p');
- status.textContent=c.is_published?'منشورة':'مسودة';
+  const status=document.createElement('p');
+  status.textContent=c.is_published?'منشورة':'مسودة';
 
- const link=document.createElement('small');
- link.textContent=c.stream_url||'لا يوجد رابط بث';
+  const link=document.createElement('small');
+  link.textContent=c.stream_url||'لا يوجد رابط بث';
 
- const actions=document.createElement('div');
- actions.className='actions';
+  const actions=document.createElement('div');
+  actions.className='actions';
 
- const edit=document.createElement('button');
- edit.textContent='تعديل';
- edit.onclick=()=>editChannel(c);
+  const edit=document.createElement('button');
+  edit.textContent='تعديل';
+  edit.onclick=()=>editChannel(c);
 
- const test=document.createElement('button');
- test.textContent='اختبار البث';
- test.className='secondary';
- test.onclick=()=>playTest(c.stream_url);
+  const test=document.createElement('button');
+  test.textContent='اختبار البث';
+  test.className='secondary';
+  test.onclick=()=>playTest(c.stream_url);
 
- const publish=document.createElement('button');
- publish.textContent=c.is_published?'إلغاء النشر':'نشر القناة';
- publish.onclick=()=>togglePublish(c);
+  const publish=document.createElement('button');
+  publish.textContent=c.is_published?'إلغاء النشر':'نشر القناة';
+  publish.onclick=()=>togglePublish(c);
 
- const remove=document.createElement('button');
- remove.textContent='حذف';
- remove.className='danger';
- remove.onclick=()=>deleteChannel(c);
+  const remove=document.createElement('button');
+  remove.textContent='حذف';
+  remove.className='danger';
+  remove.onclick=()=>deleteChannel(c);
 
- actions.append(edit,test,publish,remove);
- item.append(title,status,link,actions);
- list.append(item);
+  actions.append(edit,test,publish,remove);
+  item.append(title,status,link,actions);
+  list.append(item);
  });
+
+ if(countriesOK){
+  message.textContent='تم تحميل البيانات بنجاح';
+ }
 }
 
 function editChannel(c){
  editingId=c.id;
+
  $('channelName').value=c.name||'';
  $('countrySelect').value=c.country_id||'';
  $('logo').value=c.logo_url||'';
  $('stream').value=c.stream_url||'';
  $('category').value=c.category||'';
+
  $('formTitle').textContent='تعديل القناة';
  $('saveButton').textContent='حفظ التعديلات';
  $('cancelEdit').classList.remove('hidden');
+
  window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -196,39 +268,59 @@ $('cancelEdit').onclick=resetForm;
 
 $('channelForm').addEventListener('submit',async e=>{
  e.preventDefault();
- message.textContent='جارٍ الحفظ...';
+
+ const countryId=$('countrySelect').value;
+
+ if(!countryId){
+  message.textContent='يرجى اختيار الدولة أولاً';
+  return;
+ }
+
+ message.textContent='جارٍ حفظ القناة...';
 
  const values={
- name:$('channelName').value.trim(),
- country_id:$('countrySelect').value,
- logo_url:$('logo').value.trim()||null,
- stream_url:$('stream').value.trim()||null,
- category:$('category').value.trim()||null
+  name:$('channelName').value.trim(),
+  country_id:countryId,
+  logo_url:$('logo').value.trim()||null,
+  stream_url:$('stream').value.trim()||null,
+  category:$('category').value.trim()||null
  };
 
  let result;
 
  if(editingId){
- result=await supabase.from('channels').update(values).eq('id',editingId);
+  result=await supabase
+   .from('channels')
+   .update(values)
+   .eq('id',editingId);
  }else{
- result=await supabase.from('channels').insert({...values,is_published:false});
+  result=await supabase
+   .from('channels')
+   .insert({...values,is_published:false});
  }
 
  if(result.error){
- message.textContent='تعذر الحفظ: '+result.error.message;
- return;
+  message.textContent='تعذر الحفظ: '+result.error.message;
+  return;
  }
 
  message.textContent=editingId?'تم تحديث القناة':'تمت إضافة القناة كمسودة';
+
  resetForm();
  await loadData();
 });
 
 async function togglePublish(c){
- const {error}=await supabase.from('channels')
- .update({is_published:!c.is_published}).eq('id',c.id);
+ const {error}=await supabase
+  .from('channels')
+  .update({is_published:!c.is_published})
+  .eq('id',c.id);
 
- if(error){message.textContent='خطأ في النشر: '+error.message;return}
+ if(error){
+  message.textContent='خطأ في النشر: '+error.message;
+  return;
+ }
+
  message.textContent=c.is_published?'تم إلغاء النشر':'تم نشر القناة';
  await loadData();
 }
@@ -236,15 +328,26 @@ async function togglePublish(c){
 async function deleteChannel(c){
  if(!confirm('هل تريد حذف قناة '+c.name+'؟'))return;
 
- const {error}=await supabase.from('channels').delete().eq('id',c.id);
- if(error){message.textContent='تعذر الحذف: '+error.message;return}
+ const {error}=await supabase
+  .from('channels')
+  .delete()
+  .eq('id',c.id);
+
+ if(error){
+  message.textContent='تعذر الحذف: '+error.message;
+  return;
+ }
 
  message.textContent='تم حذف القناة';
  await loadData();
 }
 
 function stopPreview(){
- if(hls){hls.destroy();hls=null}
+ if(hls){
+  hls.destroy();
+  hls=null;
+ }
+
  preview.pause();
  preview.removeAttribute('src');
  preview.load();
@@ -252,26 +355,39 @@ function stopPreview(){
 
 function playTest(url){
  if(!url){
- message.textContent='لا يوجد رابط بث لهذه القناة';
- return;
+  message.textContent='لا يوجد رابط بث لهذه القناة';
+  return;
  }
 
  stopPreview();
 
- if(url.includes('.m3u8')&&Hls.isSupported()){
- hls=new Hls();
- hls.loadSource(url);
- hls.attachMedia(preview);
- hls.on(Hls.Events.ERROR,(event,data)=>{
- if(data.fatal)message.textContent='تعذر تشغيل البث. تحقق من الرابط أو صلاحيات CORS.';
- });
- }else{
- preview.src=url;
- }
+ if(url.toLowerCase().includes('.m3u8') && Hls.isSupported()){
+  hls=new Hls();
 
- preview.play().catch(()=>{
- message.textContent='اضغط زر التشغيل داخل مشغل الاختبار، أو تحقق من الرابط.';
- });
+  hls.on(Hls.Events.MEDIA_ATTACHED,()=>{
+   hls.loadSource(url);
+  });
+
+  hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+   preview.play().catch(()=>{
+    message.textContent='اضغط زر التشغيل داخل المشغل';
+   });
+  });
+
+  hls.on(Hls.Events.ERROR,(event,data)=>{
+   if(data.fatal){
+    message.textContent='تعذر تشغيل البث. تحقق من الرابط أو صلاحيات CORS.';
+   }
+  });
+
+  hls.attachMedia(preview);
+
+ }else{
+  preview.src=url;
+  preview.play().catch(()=>{
+   message.textContent='اضغط زر التشغيل داخل المشغل أو تحقق من الرابط';
+  });
+ }
 }
 
 $('stopPreview').onclick=stopPreview;
@@ -281,7 +397,10 @@ $('logout').onclick=async()=>{
  location.href='admin.html';
 };
 
-if(await checkAdmin())await loadData();
+if(await checkAdmin()){
+ await loadData();
+}
 </script>
+
 </body>
 </html>
