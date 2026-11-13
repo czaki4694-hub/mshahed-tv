@@ -45,6 +45,7 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 
 <section>
 <h2 id="formTitle">إضافة قناة</h2>
+
 <form id="channelForm">
 <input id="channelName" placeholder="اسم القناة" required>
 <input id="logo" type="url" placeholder="رابط شعار القناة (اختياري)">
@@ -226,35 +227,39 @@ $('channelForm').addEventListener('submit',async e=>{
 
  const values={
   name:$('channelName').value.trim(),
-  country_id:null,
   logo_url:$('logo').value.trim()||null,
   stream_url:$('stream').value.trim()||null,
   category:$('category').value.trim()||null
  };
 
+ const wasEditing=editingId!==null;
+
  let result;
 
- if(editingId){
-  result=await supabase.from('channels')
-   .update(values).eq('id',editingId);
- }else{
-  result=await supabase.from('channels')
-   .insert({...values,is_published:false});
+ try{
+  if(wasEditing){
+   result=await supabase.from('channels')
+    .update(values).eq('id',editingId);
+  }else{
+   result=await supabase.from('channels')
+    .insert({...values,is_published:false});
+  }
+
+  if(result.error){
+   message.textContent='تعذر الحفظ: '+result.error.message;
+   return;
+  }
+
+  resetForm();
+  await loadData();
+
+  message.textContent=wasEditing
+   ?'تم تحديث القناة بنجاح'
+   :'تمت إضافة القناة كمسودة بنجاح. اضغط نشر لتظهر في التطبيق.';
+
+ }catch(error){
+  message.textContent='حدث خطأ: '+error.message;
  }
-
- if(result.error){
-  message.textContent='تعذر الحفظ: '+result.error.message;
-  return;
- }
-
- const wasEditing = !!editingId;
-
-resetForm();
-await loadData();
-
-message.textContent = wasEditing
- ? 'تم تحديث القناة بنجاح'
- : 'تمت إضافة القناة كمسودة بنجاح. اضغط نشر لتظهر في التطبيق.';
 });
 
 async function togglePublish(c){
@@ -266,8 +271,8 @@ async function togglePublish(c){
   return;
  }
 
- message.textContent=c.is_published?'تم إلغاء النشر':'تم نشر القناة';
  await loadData();
+ message.textContent=c.is_published?'تم إلغاء النشر':'تم نشر القناة';
 }
 
 async function deleteChannel(c){
@@ -281,8 +286,8 @@ async function deleteChannel(c){
   return;
  }
 
- message.textContent='تم حذف القناة';
  await loadData();
+ message.textContent='تم حذف القناة';
 }
 
 function stopPreview(){
