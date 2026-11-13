@@ -247,3 +247,36 @@ loadPublishedChannels();
 if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
  navigator.serviceWorker.register("./sw.js").catch(()=>{});
 }
+
+// زر ملء الشاشة
+const videoPlayer = document.getElementById("videoPlayer");
+
+if (videoPlayer) {
+  const fullscreenBtn = document.createElement("button");
+  fullscreenBtn.id = "fullscreenBtn";
+  fullscreenBtn.textContent = "⛶ ملء الشاشة";
+  fullscreenBtn.style.cssText =
+    "display:none;margin:10px auto;padding:10px 20px;border:0;border-radius:8px;background:#2563eb;color:white;cursor:pointer;";
+
+  videoPlayer.insertAdjacentElement("afterend", fullscreenBtn);
+
+  const originalOpenPlayer = openPlayer;
+
+  openPlayer = function(c) {
+    originalOpenPlayer(c);
+    fullscreenBtn.style.display = c.stream ? "block" : "none";
+  };
+
+  fullscreenBtn.addEventListener("click", async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await videoPlayer.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  });
+}
+
