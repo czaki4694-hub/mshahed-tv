@@ -15,58 +15,86 @@ const channels = [
  {id:13,name:"France 24 عربي",country:"المغرب",category:"general",logo:"France 24",style:"blue",desc:"أخبار",stream:"https://www.france24.com/ar/live"}
 ];
 
-let selectedCountry="المغرب";
-let selectedView="all";
-let selectedFilter="all";
+let selectedCountry = "المغرب";
+let selectedView = "all";
+let selectedFilter = "all";
+let hlsPlayer = null;
 
-let favorites=JSON.parse(localStorage.getItem("mch-favorites")||"[]");
+let favorites = JSON.parse(localStorage.getItem("mch-favorites") || "[]");
 
-const grid=document.getElementById("channelGrid");
-const empty=document.getElementById("emptyState");
-const search=document.getElementById("search");
-const count=document.getElementById("count");
+const grid = document.getElementById("channelGrid");
+const empty = document.getElementById("emptyState");
+const search = document.getElementById("search");
+const count = document.getElementById("count");
 
-const titles={
+const titles = {
  all:"قنوات ",
  favorites:"قنواتك المفضلة · ",
  recent:"القنوات المضافة حديثاً · "
 };
 
-function render(){
- const q=search.value.trim().toLowerCase();
- let list=channels.filter(c=>c.country===selectedCountry);
+// إنشاء زر ملء الشاشة
+const videoPlayer = document.getElementById("videoPlayer");
+const fullscreenBtn = document.createElement("button");
 
- if(selectedView==="favorites")
-  list=list.filter(c=>favorites.includes(c.id));
+fullscreenBtn.id = "fullscreenBtn";
+fullscreenBtn.textContent = "⛶ ملء الشاشة";
+fullscreenBtn.style.cssText =
+ "display:none;width:100%;padding:12px;margin-top:10px;border:0;border-radius:8px;background:#2563eb;color:white;font-size:16px;";
 
- if(selectedView==="recent")
-  list=list.slice(-4).reverse();
+videoPlayer.insertAdjacentElement("afterend", fullscreenBtn);
 
- if(selectedFilter!=="all")
-  list=list.filter(c=>c.category===selectedFilter);
+fullscreenBtn.addEventListener("click", async () => {
+ try {
+  if (document.fullscreenElement) {
+   await document.exitFullscreen();
+  } else if (videoPlayer.requestFullscreen) {
+   await videoPlayer.requestFullscreen();
+  } else if (videoPlayer.webkitEnterFullscreen) {
+   videoPlayer.webkitEnterFullscreen();
+  }
+ } catch (error) {
+  console.error("خطأ ملء الشاشة:", error);
+ }
+});
 
- if(q)
-  list=list.filter(c=>(c.name+" "+c.logo+" "+c.desc).toLowerCase().includes(q));
+function render() {
+ const q = search.value.trim().toLowerCase();
+ let list = channels.filter(c => c.country === selectedCountry);
 
- count.textContent=list.length;
+ if (selectedView === "favorites")
+  list = list.filter(c => favorites.includes(c.id));
 
- document.getElementById("sectionTitle").childNodes[0].textContent=
- (titles[selectedView]||"قنوات ")+
- (selectedView==="all"?selectedCountry:"");
+ if (selectedView === "recent")
+  list = list.slice(-4).reverse();
 
- grid.innerHTML="";
+ if (selectedFilter !== "all")
+  list = list.filter(c => c.category === selectedFilter);
 
- list.forEach(c=>{
-  const card=document.createElement("article");
-  card.className="channel-card";
-  card.tabIndex=0;
-  card.setAttribute("role","button");
-  card.setAttribute("aria-label","فتح "+c.name);
+ if (q)
+  list = list.filter(c =>
+   (c.name + " " + c.logo + " " + c.desc).toLowerCase().includes(q)
+  );
 
-  card.innerHTML=`
+ count.textContent = list.length;
+
+ document.getElementById("sectionTitle").childNodes[0].textContent =
+  (titles[selectedView] || "قنوات ") +
+  (selectedView === "all" ? selectedCountry : "");
+
+ grid.innerHTML = "";
+
+ list.forEach(c => {
+  const card = document.createElement("article");
+  card.className = "channel-card";
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", "فتح " + c.name);
+
+  card.innerHTML = `
    <span class="channel-badge">${c.desc}</span>
-   <button class="fav-btn ${favorites.includes(c.id)?"selected":""}" aria-label="إضافة للمفضلة">
-   ${favorites.includes(c.id)?"♥":"♡"}</button>
+   <button class="fav-btn ${favorites.includes(c.id) ? "selected" : ""}" aria-label="إضافة للمفضلة">
+   ${favorites.includes(c.id) ? "♥" : "♡"}</button>
    <div class="channel-logo">
     <div class="logo-shape ${c.style}">${c.logo}</div>
    </div>
@@ -74,209 +102,263 @@ function render(){
    <div class="channel-meta">${c.country} · ${c.desc}</div>
   `;
 
-  card.querySelector(".fav-btn").addEventListener("click",e=>{
+  card.querySelector(".fav-btn").addEventListener("click", e => {
    e.stopPropagation();
    toggleFavorite(c.id);
   });
 
-  card.addEventListener("click",()=>openPlayer(c));
-  card.addEventListener("keydown",e=>{
-   if(e.key==="Enter")openPlayer(c);
+  card.addEventListener("click", () => openPlayer(c));
+
+  card.addEventListener("keydown", e => {
+   if (e.key === "Enter") openPlayer(c);
   });
 
   grid.appendChild(card);
  });
 
- empty.hidden=list.length!==0;
- grid.hidden=list.length===0;
+ empty.hidden = list.length !== 0;
+ grid.hidden = list.length === 0;
 }
 
-function toggleFavorite(id){
- favorites=favorites.includes(id)?
- favorites.filter(x=>x!==id):[...favorites,id];
+function toggleFavorite(id) {
+ favorites = favorites.includes(id)
+  ? favorites.filter(x => x !== id)
+  : [...favorites, id];
 
- localStorage.setItem("mch-favorites",JSON.stringify(favorites));
+ localStorage.setItem("mch-favorites", JSON.stringify(favorites));
  render();
- toast(favorites.includes(id)?"أضيفت إلى المفضلة":"حذفت من المفضلة");
+
+ toast(favorites.includes(id) ? "أضيفت إلى المفضلة" : "حذفت من المفضلة");
 }
 
-function openPlayer(c){
- document.getElementById("playerTitle").textContent=c.name;
+// تشغيل القناة
+function openPlayer(c) {
+ document.getElementById("playerTitle").textContent = c.name;
 
- const modal=document.getElementById("playerModal");
- const video=document.getElementById("videoPlayer");
+ const modal = document.getElementById("playerModal");
+ const video = document.getElementById("videoPlayer");
+ const placeholder = document.getElementById("videoPlaceholder");
 
- video.pause();
- video.removeAttribute("src");
- video.style.display="none";
+ stopPlayer();
 
- document.getElementById("videoPlaceholder").style.display="flex";
-
- if(c.stream){
-  video.src=c.stream;
-  video.style.display="block";
-  document.getElementById("videoPlaceholder").style.display="none";
-  video.play().catch(()=>{});
- }
+ placeholder.style.display = "flex";
+ fullscreenBtn.style.display = "none";
 
  modal.classList.add("open");
- modal.setAttribute("aria-hidden","false");
+ modal.setAttribute("aria-hidden", "false");
+
+ if (!c.stream) {
+  placeholder.querySelector("p").textContent = "لا يوجد رابط بث لهذه القناة حالياً.";
+  return;
+ }
+
+ placeholder.querySelector("p").textContent = "جارٍ تحميل البث...";
+ placeholder.style.display = "flex";
+
+ video.style.display = "block";
+ fullscreenBtn.style.display = "block";
+
+ const url = c.stream.trim();
+
+ if (url.includes(".m3u8")) {
+  if (window.Hls && Hls.isSupported()) {
+   hlsPlayer = new Hls();
+
+   hlsPlayer.loadSource(url);
+   hlsPlayer.attachMedia(video);
+
+   hlsPlayer.on(Hls.Events.MANIFEST_PARSED, () => {
+    placeholder.style.display = "none";
+    video.play().catch(() => {});
+   });
+
+   hlsPlayer.on(Hls.Events.ERROR, (event, data) => {
+    if (data.fatal) {
+     placeholder.style.display = "flex";
+     placeholder.querySelector("p").textContent =
+      "تعذر تشغيل البث. تحقق من الرابط أو صلاحيات خادم البث.";
+     console.error("HLS error:", data);
+    }
+   });
+
+  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+   video.src = url;
+
+   video.addEventListener("loadedmetadata", () => {
+    placeholder.style.display = "none";
+    video.play().catch(() => {});
+   }, { once: true });
+
+   video.addEventListener("error", () => {
+    placeholder.style.display = "flex";
+    placeholder.querySelector("p").textContent = "تعذر تشغيل رابط البث.";
+   }, { once: true });
+
+  } else {
+   placeholder.querySelector("p").textContent =
+    "متصفحك لا يدعم تشغيل هذا النوع من البث.";
+  }
+
+ } else {
+  video.src = url;
+
+  video.addEventListener("loadedmetadata", () => {
+   placeholder.style.display = "none";
+   video.play().catch(() => {});
+  }, { once: true });
+
+  video.addEventListener("error", () => {
+   placeholder.style.display = "flex";
+   placeholder.querySelector("p").textContent =
+    "تعذر تشغيل الفيديو. تأكد أن الرابط مباشر وصحيح.";
+  }, { once: true });
+ }
 }
 
-function closePlayer(){
- const m=document.getElementById("playerModal");
- const v=document.getElementById("videoPlayer");
- v.pause();
- m.classList.remove("open");
- m.setAttribute("aria-hidden","true");
+function stopPlayer() {
+ const video = document.getElementById("videoPlayer");
+
+ video.pause();
+
+ if (hlsPlayer) {
+  hlsPlayer.destroy();
+  hlsPlayer = null;
+ }
+
+ video.removeAttribute("src");
+ video.load();
 }
 
-document.getElementById("closePlayer").addEventListener("click",closePlayer);
+function closePlayer() {
+ const modal = document.getElementById("playerModal");
 
-document.getElementById("playerModal").addEventListener("click",e=>{
- if(e.target.id==="playerModal")closePlayer();
+ stopPlayer();
+
+ document.getElementById("videoPlaceholder").style.display = "flex";
+ fullscreenBtn.style.display = "none";
+
+ modal.classList.remove("open");
+ modal.setAttribute("aria-hidden", "true");
+}
+
+document.getElementById("closePlayer").addEventListener("click", closePlayer);
+
+document.getElementById("playerModal").addEventListener("click", e => {
+ if (e.target.id === "playerModal") closePlayer();
 });
 
-document.addEventListener("keydown",e=>{
- if(e.key==="Escape")closePlayer();
+document.addEventListener("keydown", e => {
+ if (e.key === "Escape") closePlayer();
 });
 
-document.querySelectorAll("[data-view]").forEach(b=>{
- b.addEventListener("click",()=>{
-  selectedView=b.dataset.view;
-  document.querySelectorAll("[data-view]").forEach(x=>
-   x.classList.toggle("active",x===b)
-  );
-  render();
- });
-});
+document.querySelectorAll("[data-view]").forEach(b => {
+ b.addEventListener("click", () => {
+  selectedView = b.dataset.view;
 
-document.querySelectorAll("[data-country]").forEach(b=>{
- b.addEventListener("click",()=>{
-  selectedCountry=b.dataset.country;
-  selectedView="all";
-
-  document.querySelectorAll("[data-country]").forEach(x=>
-   x.classList.toggle("active",x===b)
-  );
-
-  document.querySelectorAll("[data-view]").forEach(x=>
-   x.classList.toggle("active",x.dataset.view==="all")
-  );
-
-  document.getElementById("crumb").textContent=selectedCountry;
-  render();
- });
-});
-
-document.querySelectorAll("[data-filter]").forEach(b=>{
- b.addEventListener("click",()=>{
-  selectedFilter=b.dataset.filter;
-
-  document.querySelectorAll("[data-filter]").forEach(x=>
-   x.classList.toggle("active",x===b)
+  document.querySelectorAll("[data-view]").forEach(x =>
+   x.classList.toggle("active", x === b)
   );
 
   render();
  });
 });
 
-search.addEventListener("input",render);
+document.querySelectorAll("[data-country]").forEach(b => {
+ b.addEventListener("click", () => {
+  selectedCountry = b.dataset.country;
+  selectedView = "all";
 
-document.getElementById("browseBtn").addEventListener("click",()=>{
- document.getElementById("channelsSection").scrollIntoView({behavior:"smooth"});
+  document.querySelectorAll("[data-country]").forEach(x =>
+   x.classList.toggle("active", x === b)
+  );
+
+  document.querySelectorAll("[data-view]").forEach(x =>
+   x.classList.toggle("active", x.dataset.view === "all")
+  );
+
+  document.getElementById("crumb").textContent = selectedCountry;
+  render();
+ });
+});
+
+document.querySelectorAll("[data-filter]").forEach(b => {
+ b.addEventListener("click", () => {
+  selectedFilter = b.dataset.filter;
+
+  document.querySelectorAll("[data-filter]").forEach(x =>
+   x.classList.toggle("active", x === b)
+  );
+
+  render();
+ });
+});
+
+search.addEventListener("input", render);
+
+document.getElementById("browseBtn").addEventListener("click", () => {
+ document.getElementById("channelsSection").scrollIntoView({
+  behavior: "smooth"
+ });
 });
 
 let toastTimer;
 
-function toast(msg){
- const el=document.getElementById("toast");
- el.textContent=msg;
+function toast(msg) {
+ const el = document.getElementById("toast");
+ el.textContent = msg;
  el.classList.add("show");
+
  clearTimeout(toastTimer);
- toastTimer=setTimeout(()=>el.classList.remove("show"),1800);
+ toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
 }
 
-// تحميل القنوات المنشورة من Supabase
-const SUPABASE_URL="https://irkjsubiecrbhladkdko.supabase.co";
+// Supabase
+const SUPABASE_URL = "https://irkjsubiecrbhladkdko.supabase.co";
+const SUPABASE_KEY = "sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc";
 
-// ضع Publishable Key الحقيقي هنا
-const SUPABASE_KEY="sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc";
-
-async function loadPublishedChannels(){
- try{
-  const response=await fetch(
+async function loadPublishedChannels() {
+ try {
+  const response = await fetch(
    `${SUPABASE_URL}/rest/v1/channels?select=id,name,logo_url,stream_url,category,is_published,country_id&is_published=eq.true`,
    {
-    headers:{
-     apikey:SUPABASE_KEY,
-     Authorization:`Bearer ${SUPABASE_KEY}`
+    headers: {
+     apikey: SUPABASE_KEY,
+     Authorization: `Bearer ${SUPABASE_KEY}`
     }
    }
   );
 
-  if(!response.ok)throw new Error(await response.text());
+  if (!response.ok) throw new Error(await response.text());
 
-  const rows=await response.json();
+  const rows = await response.json();
 
-  rows.forEach(row=>{
-   if(channels.some(c=>String(c.id)==="db-"+row.id))return;
+  rows.forEach(row => {
+   const dbId = "db-" + row.id;
+
+   if (channels.some(c => c.id === dbId)) return;
 
    channels.push({
-    id:"db-"+row.id,
-    name:row.name,
-    country:"المغرب",
-    category:"general",
-    logo:row.logo_url||row.name,
-    style:"blue",
-    desc:row.category||"قناة عامة",
-    stream:row.stream_url
+    id: dbId,
+    name: row.name,
+    country: "المغرب",
+    category: "general",
+    logo: row.logo_url || row.name,
+    style: "blue",
+    desc: row.category || "قناة عامة",
+    stream: row.stream_url
    });
   });
 
   render();
 
- }catch(error){
-  console.error("خطأ تحميل القنوات:",error);
+ } catch (error) {
+  console.error("خطأ تحميل القنوات:", error);
  }
 }
 
 render();
 loadPublishedChannels();
 
-if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
- navigator.serviceWorker.register("./sw.js").catch(()=>{});
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+ navigator.serviceWorker.register("./sw.js").catch(() => {});
 }
-
-// زر ملء الشاشة
-const videoPlayer = document.getElementById("videoPlayer");
-
-if (videoPlayer) {
-  const fullscreenBtn = document.createElement("button");
-  fullscreenBtn.id = "fullscreenBtn";
-  fullscreenBtn.textContent = "⛶ ملء الشاشة";
-  fullscreenBtn.style.cssText =
-    "display:none;margin:10px auto;padding:10px 20px;border:0;border-radius:8px;background:#2563eb;color:white;cursor:pointer;";
-
-  videoPlayer.insertAdjacentElement("afterend", fullscreenBtn);
-
-  const originalOpenPlayer = openPlayer;
-
-  openPlayer = function(c) {
-    originalOpenPlayer(c);
-    fullscreenBtn.style.display = c.stream ? "block" : "none";
-  };
-
-  fullscreenBtn.addEventListener("click", async () => {
-    try {
-      if (!document.fullscreenElement) {
-        await videoPlayer.requestFullscreen();
-      } else {
-        await document.exitFullscreen();
-      }
-    } catch (error) {
-      console.error(error);
-    }
-  });
-}
-
