@@ -1,0 +1,140 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>لوحة تحكم مِشاهِد TV</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#081426;color:#fff;font-family:Arial,sans-serif}
+header{background:#13243a;padding:22px;text-align:center;border-bottom:2px solid #ff9d45}
+h1{color:#ff9d45;margin:0}
+main{max-width:850px;margin:25px auto;padding:15px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.card{background:#13243a;border:1px solid #29415d;padding:22px;border-radius:15px;text-align:center}
+.card strong{display:block;font-size:28px;color:#ff9d45}
+section{background:#13243a;margin-top:20px;padding:20px;border-radius:15px}
+input,select,button{width:100%;padding:13px;margin:8px 0;border-radius:9px;font-size:15px}
+input,select{background:#081426;color:white;border:1px solid #40536b}
+button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer}
+.item{padding:12px;border-bottom:1px solid #40536b}
+.danger{background:#a83232;color:white}
+#message{color:#ffbd75}
+</style>
+</head>
+<body>
+<header>
+<h1>مِشاهِد TV</h1>
+<p>لوحة الإدارة والتحكم</p>
+</header>
+
+<main>
+<div class="cards">
+<div class="card">القنوات<strong id="channelCount">0</strong></div>
+<div class="card">الدول<strong id="countryCount">0</strong></div>
+<div class="card">المباريات<strong id="matchCount">0</strong></div>
+</div>
+
+<section>
+<h2>إضافة قناة</h2>
+<form id="channelForm">
+<input id="channelName" placeholder="اسم القناة" required>
+<select id="countrySelect" required>
+<option value="">اختر الدولة</option>
+</select>
+<input id="logo" type="url" placeholder="رابط شعار القناة (اختياري)">
+<input id="stream" type="url" placeholder="رابط البث المرخّص">
+<input id="category" placeholder="التصنيف">
+<button>حفظ القناة</button>
+</form>
+</section>
+
+<section>
+<h2>القنوات المسجلة</h2>
+<div id="channelsList">جارٍ التحميل...</div>
+</section>
+
+<section>
+<h2>تسجيل الخروج</h2>
+<button class="danger" id="logout">خروج من لوحة الإدارة</button>
+<p id="message"></p>
+</section>
+</main>
+
+<script type="module">
+import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+
+const supabase=createClient(
+'https://irkjsubiecrbhladkdko.supabase.co',
+'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc'
+);
+
+const message=document.getElementById('message');
+const list=document.getElementById('channelsList');
+
+async function checkAdmin(){
+ const {data:{user}}=await supabase.auth.getUser();
+ if(!user){location.href='admin.html';return false}
+ const {data,error}=await supabase.from('admin_users')
+ .select('user_id').eq('user_id',user.id).maybeSingle();
+ if(error||!data){await supabase.auth.signOut();location.href='admin.html';return false}
+ return true;
+}
+
+async function loadData(){
+ const [channels,countries,matches]=await Promise.all([
+ supabase.from('channels').select('*'),
+ supabase.from('countries').select('*'),
+ supabase.from('matches').select('*')
+ ]);
+ if(channels.error||countries.error||matches.error){
+ message.textContent='تعذر تحميل البيانات. تحقق من الاتصال.';
+ return;
+ }
+ document.getElementById('channelCount').textContent=channels.data.length;
+ document.getElementById('countryCount').textContent=countries.data.length;
+ document.getElementById('matchCount').textContent=matches.data.length;
+
+ const select=document.getElementById('countrySelect');
+ select.innerHTML='<option value="">اختر الدولة</option>';
+ countries.data.forEach(c=>{
+ const option=document.createElement('option');
+ option.value=c.id;option.textContent=c.name;
+ select.appendChild(option);
+ });
+
+ list.replaceChildren();
+ channels.data.forEach(c=>{
+ const item=document.createElement('div');
+ item.className='item';
+ item.textContent=c.name+' — '+(c.is_published?'منشورة':'مسودة');
+ list.appendChild(item);
+ });
+}
+
+document.getElementById('channelForm').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const {error}=await supabase.from('channels').insert({
+ name:document.getElementById('channelName').value,
+ country_id:document.getElementById('countrySelect').value,
+ logo_url:document.getElementById('logo').value||null,
+ stream_url:document.getElementById('stream').value||null,
+ category:document.getElementById('category').value||null,
+ is_published:false
+ });
+ if(error){message.textContent='خطأ: '+error.message;return}
+ message.textContent='تم حفظ القناة كمسودة بنجاح';
+ e.target.reset();
+ await loadData();
+});
+
+document.getElementById('logout').addEventListener('click',async()=>{
+ await supabase.auth.signOut();
+ location.href='admin.html';
+});
+
+if(await checkAdmin()) await loadData();
+</script>
+</body>
+</html>
