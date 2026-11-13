@@ -3,17 +3,47 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>إدارة المباريات - مشاهد TV</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-body{background:#101827;color:white;font-family:Arial;padding:20px}
-main{max-width:600px;margin:auto}
-input,button{box-sizing:border-box;width:100%;padding:13px;margin:7px 0;border:0;border-radius:9px}
-input{background:#243247;color:white}
-button{background:#ff8b35;color:#111;font-weight:bold}
-.match{background:#243247;padding:13px;margin:10px 0;border-radius:10px}
-.delete{background:#bd3838;color:white}
+body {
+ background:#101827;
+ color:white;
+ font-family:Arial;
+ padding:20px;
+}
+main {
+ max-width:600px;
+ margin:auto;
+}
+input,button {
+ box-sizing:border-box;
+ width:100%;
+ padding:13px;
+ margin:7px 0;
+ border:0;
+ border-radius:9px;
+}
+input {
+ background:#243247;
+ color:white;
+}
+button {
+ background:#ff8b35;
+ color:#111;
+ font-weight:bold;
+}
+.match {
+ background:#243247;
+ padding:13px;
+ margin:10px 0;
+ border-radius:10px;
+}
+.delete {
+ background:#bd3838;
+ color:white;
+}
 </style>
 </head>
 <body>
@@ -38,42 +68,42 @@ button{background:#ff8b35;color:#111;font-weight:bold}
 
 <script>
 const db = supabase.createClient(
-'https://irkjsubiecrbhladkdko.supabase.co',
-'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc'
+ 'https://irkjsubiecrbhladkdko.supabase.co',
+ 'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc'
 );
 
-async function checkAdmin(){
- const {data:{user}}=await db.auth.getUser();
+async function checkAdmin() {
+ const {data:{user}} = await db.auth.getUser();
 
- if(!user){
-  location.href='admin.html';
+ if (!user) {
+  location.href = 'admin.html';
   return false;
  }
 
- const {data}=await db.from('admin_users')
- .select('user_id')
- .eq('user_id',user.id)
- .maybeSingle();
+ const {data,error} = await db.from('admin_users')
+  .select('user_id')
+  .eq('user_id',user.id)
+  .maybeSingle();
 
- if(!data){
-  document.body.innerHTML='غير مصرح بالدخول';
+ if (error || !data) {
+  document.body.innerHTML = 'غير مصرح بالدخول';
   return false;
  }
 
  return true;
 }
 
-async function addMatch(){
- const home=document.getElementById('home').value.trim();
- const away=document.getElementById('away').value.trim();
- const date=document.getElementById('date').value;
+async function addMatch() {
+ const home = document.getElementById('home').value.trim();
+ const away = document.getElementById('away').value.trim();
+ const date = document.getElementById('date').value;
 
- if(!home||!away||!date){
+ if (!home || !away || !date) {
   alert('أدخل الفريقين والموعد');
   return;
  }
 
- const {error}=await db.from('matches').insert({
+ const {error} = await db.from('matches').insert({
   home_team:home,
   away_team:away,
   competition:document.getElementById('league').value,
@@ -82,67 +112,69 @@ async function addMatch(){
   is_published:false
  });
 
- if(error){
+ if (error) {
   alert(error.message);
   return;
  }
 
- alert('تمت إضافة المباراة');
- document.querySelectorAll('input').forEach(x=>x.value='');
+ alert('تمت إضافة المباراة بنجاح');
+ document.querySelectorAll('input').forEach(x => x.value='');
  loadMatches();
 }
 
-async function loadMatches(){
- const box=document.getElementById('matches');
+async function loadMatches() {
+ const box = document.getElementById('matches');
 
- const {data,error}=await db.from('matches')
- .select('*')
- .order('starts_at',{ascending:true});
+ const {data,error} = await db.from('matches')
+  .select('*')
+  .order('starts_at',{ascending:true});
 
- if(error){
-  box.textContent=error.message;
+ if (error) {
+  box.textContent = error.message;
   return;
  }
 
- box.innerHTML='';
+ box.innerHTML = '';
 
- (data||[]).forEach(m=>{
-  const div=document.createElement('div');
-  div.className='match';
+ (data || []).forEach(m => {
+  const div = document.createElement('div');
+  div.className = 'match';
 
-  const title=document.createElement('b');
-  title.textContent=(m.home_team||'')+' × '+(m.away_team||'');
+  const title = document.createElement('b');
+  title.textContent = (m.home_team || '') + ' × ' + (m.away_team || '');
 
-  const info=document.createElement('p');
-  info.textContent=(m.competition||'')+' — '+
-  (m.starts_at?new Date(m.starts_at).toLocaleString('ar'):'');
+  const info = document.createElement('p');
+  info.textContent = (m.competition || '') + ' — ' +
+   (m.starts_at ? new Date(m.starts_at).toLocaleString('ar') : '');
 
-  const status=document.createElement('p');
-  status.textContent=m.is_published?'منشورة':'مسودة';
+  const status = document.createElement('p');
+  status.textContent = m.is_published ? 'منشورة' : 'مسودة';
 
-  const del=document.createElement('button');
-  del.className='delete';
-  del.textContent='حذف المباراة';
-  del.onclick=()=>deleteMatch(m.id);
+  const del = document.createElement('button');
+  del.className = 'delete';
+  del.textContent = 'حذف المباراة';
+  del.onclick = () => deleteMatch(m.id);
 
   div.append(title,info,status,del);
   box.append(div);
  });
 
- if(!data?.length)box.textContent='لا توجد مباريات بعد';
+ if (!data?.length) {
+  box.textContent = 'لا توجد مباريات بعد';
+ }
 }
 
-async function deleteMatch(id){
- if(!confirm('هل تريد حذف المباراة؟'))return;
+async function deleteMatch(id) {
+ if (!confirm('هل تريد حذف المباراة؟')) return;
 
- const {error}=await db.from('matches').delete().eq('id',id);
+ const {error} = await db.from('matches').delete().eq('id',id);
 
- if(error)alert(error.message);
+ if (error) alert(error.message);
  else loadMatches();
 }
 
-checkAdmin().then(ok=>{
- if(ok)loadMatches();
+checkAdmin().then(ok => {
+ if (ok) loadMatches();
 });
 </script>
 </body>
