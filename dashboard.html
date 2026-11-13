@@ -4,23 +4,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>لوحة تحكم مِشاهِد TV</title>
+<title>لوحة مِشاهِد TV</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#081426;color:#fff;font-family:Arial,sans-serif}
 header{background:#13243a;padding:22px;text-align:center;border-bottom:2px solid #ff9d45}
 h1{color:#ff9d45;margin:0}
 main{max-width:850px;margin:25px auto;padding:15px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
-.card{background:#13243a;border:1px solid #29415d;padding:22px;border-radius:15px;text-align:center}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px}
+.card,section{background:#13243a;border:1px solid #29415d;padding:20px;border-radius:15px}
+.card{text-align:center}
 .card strong{display:block;font-size:28px;color:#ff9d45}
-section{background:#13243a;margin-top:20px;padding:20px;border-radius:15px}
+section{margin-top:20px}
 input,select,button{width:100%;padding:13px;margin:8px 0;border-radius:9px;font-size:15px}
 input,select{background:#081426;color:white;border:1px solid #40536b}
 button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer}
-.item{padding:12px;border-bottom:1px solid #40536b}
+.item{padding:14px 0;border-bottom:1px solid #40536b}
+.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.actions button{font-size:13px;padding:10px}
 .danger{background:#a83232;color:white}
-#message{color:#ffbd75}
+.secondary{background:#40536b;color:white}
+#message{color:#ffbd75;white-space:pre-wrap}
+video{width:100%;background:#000;border-radius:10px;margin-top:10px}
+.hidden{display:none}
 </style>
 </head>
 <body>
@@ -37,7 +43,7 @@ button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer
 </div>
 
 <section>
-<h2>إضافة قناة</h2>
+<h2 id="formTitle">إضافة قناة</h2>
 <form id="channelForm">
 <input id="channelName" placeholder="اسم القناة" required>
 <select id="countrySelect" required>
@@ -46,13 +52,21 @@ button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer
 <input id="logo" type="url" placeholder="رابط شعار القناة (اختياري)">
 <input id="stream" type="url" placeholder="رابط البث المرخّص">
 <input id="category" placeholder="التصنيف">
-<button>حفظ القناة</button>
+<button id="saveButton">حفظ القناة</button>
+<button type="button" class="secondary hidden" id="cancelEdit">إلغاء التعديل</button>
 </form>
 </section>
 
 <section>
 <h2>القنوات المسجلة</h2>
 <div id="channelsList">جارٍ التحميل...</div>
+</section>
+
+<section>
+<h2>اختبار البث</h2>
+<p>أدخل رابط القناة أو اختر اختبار قناة من القائمة.</p>
+<video id="preview" controls playsinline></video>
+<button id="stopPreview" class="secondary">إيقاف الاختبار</button>
 </section>
 
 <section>
@@ -64,77 +78,210 @@ button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer
 
 <script type="module">
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
+import Hls from 'https://esm.sh/hls.js@1.5.17';
 
 const supabase=createClient(
 'https://irkjsubiecrbhladkdko.supabase.co',
 'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc'
 );
 
-const message=document.getElementById('message');
-const list=document.getElementById('channelsList');
+const $=id=>document.getElementById(id);
+const message=$('message');
+const list=$('channelsList');
+const preview=$('preview');
+
+let editingId=null;
+let hls=null;
 
 async function checkAdmin(){
  const {data:{user}}=await supabase.auth.getUser();
  if(!user){location.href='admin.html';return false}
  const {data,error}=await supabase.from('admin_users')
  .select('user_id').eq('user_id',user.id).maybeSingle();
- if(error||!data){await supabase.auth.signOut();location.href='admin.html';return false}
+ if(error||!data){
+ await supabase.auth.signOut();
+ location.href='admin.html';
+ return false;
+ }
  return true;
 }
 
 async function loadData(){
  const [channels,countries,matches]=await Promise.all([
- supabase.from('channels').select('*'),
+ supabase.from('channels').select('*').order('created_at',{ascending:false}),
  supabase.from('countries').select('*'),
  supabase.from('matches').select('*')
  ]);
+
  if(channels.error||countries.error||matches.error){
- message.textContent='تعذر تحميل البيانات. تحقق من الاتصال.';
+ message.textContent='تعذر تحميل البيانات: '+
+ (channels.error||countries.error||matches.error).message;
  return;
  }
- document.getElementById('channelCount').textContent=channels.data.length;
- document.getElementById('countryCount').textContent=countries.data.length;
- document.getElementById('matchCount').textContent=matches.data.length;
 
- const select=document.getElementById('countrySelect');
- select.innerHTML='<option value="">اختر الدولة</option>';
+ $('channelCount').textContent=channels.data.length;
+ $('countryCount').textContent=countries.data.length;
+ $('matchCount').textContent=matches.data.length;
+
+ const select=$('countrySelect');
+ select.replaceChildren(new Option('اختر الدولة',''));
  countries.data.forEach(c=>{
- const option=document.createElement('option');
- option.value=c.id;option.textContent=c.name;
- select.appendChild(option);
+ select.add(new Option(c.name,c.id));
  });
 
  list.replaceChildren();
+
  channels.data.forEach(c=>{
  const item=document.createElement('div');
  item.className='item';
- item.textContent=c.name+' — '+(c.is_published?'منشورة':'مسودة');
- list.appendChild(item);
+
+ const title=document.createElement('strong');
+ title.textContent=c.name;
+
+ const status=document.createElement('p');
+ status.textContent=c.is_published?'منشورة':'مسودة';
+
+ const link=document.createElement('small');
+ link.textContent=c.stream_url||'لا يوجد رابط بث';
+
+ const actions=document.createElement('div');
+ actions.className='actions';
+
+ const edit=document.createElement('button');
+ edit.textContent='تعديل';
+ edit.onclick=()=>editChannel(c);
+
+ const test=document.createElement('button');
+ test.textContent='اختبار البث';
+ test.className='secondary';
+ test.onclick=()=>playTest(c.stream_url);
+
+ const publish=document.createElement('button');
+ publish.textContent=c.is_published?'إلغاء النشر':'نشر القناة';
+ publish.onclick=()=>togglePublish(c);
+
+ const remove=document.createElement('button');
+ remove.textContent='حذف';
+ remove.className='danger';
+ remove.onclick=()=>deleteChannel(c);
+
+ actions.append(edit,test,publish,remove);
+ item.append(title,status,link,actions);
+ list.append(item);
  });
 }
 
-document.getElementById('channelForm').addEventListener('submit',async e=>{
+function editChannel(c){
+ editingId=c.id;
+ $('channelName').value=c.name||'';
+ $('countrySelect').value=c.country_id||'';
+ $('logo').value=c.logo_url||'';
+ $('stream').value=c.stream_url||'';
+ $('category').value=c.category||'';
+ $('formTitle').textContent='تعديل القناة';
+ $('saveButton').textContent='حفظ التعديلات';
+ $('cancelEdit').classList.remove('hidden');
+ window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function resetForm(){
+ editingId=null;
+ $('channelForm').reset();
+ $('formTitle').textContent='إضافة قناة';
+ $('saveButton').textContent='حفظ القناة';
+ $('cancelEdit').classList.add('hidden');
+}
+
+$('cancelEdit').onclick=resetForm;
+
+$('channelForm').addEventListener('submit',async e=>{
  e.preventDefault();
- const {error}=await supabase.from('channels').insert({
- name:document.getElementById('channelName').value,
- country_id:document.getElementById('countrySelect').value,
- logo_url:document.getElementById('logo').value||null,
- stream_url:document.getElementById('stream').value||null,
- category:document.getElementById('category').value||null,
- is_published:false
- });
- if(error){message.textContent='خطأ: '+error.message;return}
- message.textContent='تم حفظ القناة كمسودة بنجاح';
- e.target.reset();
+ message.textContent='جارٍ الحفظ...';
+
+ const values={
+ name:$('channelName').value.trim(),
+ country_id:$('countrySelect').value,
+ logo_url:$('logo').value.trim()||null,
+ stream_url:$('stream').value.trim()||null,
+ category:$('category').value.trim()||null
+ };
+
+ let result;
+
+ if(editingId){
+ result=await supabase.from('channels').update(values).eq('id',editingId);
+ }else{
+ result=await supabase.from('channels').insert({...values,is_published:false});
+ }
+
+ if(result.error){
+ message.textContent='تعذر الحفظ: '+result.error.message;
+ return;
+ }
+
+ message.textContent=editingId?'تم تحديث القناة':'تمت إضافة القناة كمسودة';
+ resetForm();
  await loadData();
 });
 
-document.getElementById('logout').addEventListener('click',async()=>{
+async function togglePublish(c){
+ const {error}=await supabase.from('channels')
+ .update({is_published:!c.is_published}).eq('id',c.id);
+
+ if(error){message.textContent='خطأ في النشر: '+error.message;return}
+ message.textContent=c.is_published?'تم إلغاء النشر':'تم نشر القناة';
+ await loadData();
+}
+
+async function deleteChannel(c){
+ if(!confirm('هل تريد حذف قناة '+c.name+'؟'))return;
+
+ const {error}=await supabase.from('channels').delete().eq('id',c.id);
+ if(error){message.textContent='تعذر الحذف: '+error.message;return}
+
+ message.textContent='تم حذف القناة';
+ await loadData();
+}
+
+function stopPreview(){
+ if(hls){hls.destroy();hls=null}
+ preview.pause();
+ preview.removeAttribute('src');
+ preview.load();
+}
+
+function playTest(url){
+ if(!url){
+ message.textContent='لا يوجد رابط بث لهذه القناة';
+ return;
+ }
+
+ stopPreview();
+
+ if(url.includes('.m3u8')&&Hls.isSupported()){
+ hls=new Hls();
+ hls.loadSource(url);
+ hls.attachMedia(preview);
+ hls.on(Hls.Events.ERROR,(event,data)=>{
+ if(data.fatal)message.textContent='تعذر تشغيل البث. تحقق من الرابط أو صلاحيات CORS.';
+ });
+ }else{
+ preview.src=url;
+ }
+
+ preview.play().catch(()=>{
+ message.textContent='اضغط زر التشغيل داخل مشغل الاختبار، أو تحقق من الرابط.';
+ });
+}
+
+$('stopPreview').onclick=stopPreview;
+
+$('logout').onclick=async()=>{
  await supabase.auth.signOut();
  location.href='admin.html';
-});
+};
 
-if(await checkAdmin()) await loadData();
+if(await checkAdmin())await loadData();
 </script>
 </body>
 </html>
