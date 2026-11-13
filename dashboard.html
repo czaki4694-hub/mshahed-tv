@@ -46,7 +46,6 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 
 <section>
 <h2 id="formTitle">إضافة قناة</h2>
-
 <form id="channelForm">
 <input id="channelName" placeholder="اسم القناة" required>
 
@@ -87,10 +86,11 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 import Hls from 'https://esm.sh/hls.js@1.5.17';
 
-const supabase=createClient(
-'https://irkjsubiecrbhladkdko.supabase.co',
-'sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_jkxFdjc'
-);
+const SUPABASE_URL='https://irkjsubiecrbhladkdko.supabase.co';
+
+const SUPABASE_KEY='sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc';
+
+const supabase=createClient(SUPABASE_URL,SUPABASE_KEY);
 
 const $=id=>document.getElementById(id);
 const message=$('message');
@@ -102,40 +102,40 @@ let hls=null;
 
 async function checkAdmin(){
  try{
-  const {data:{user},error:userError}=await supabase.auth.getUser();
+  const {data,error}=await supabase.auth.getUser();
 
-  if(userError) throw userError;
+  if(error)throw error;
+
+  const user=data.user;
 
   if(!user){
    location.href='admin.html';
    return false;
   }
 
-  const {data,error}=await supabase
+  const {data:admin,error:adminError}=await supabase
    .from('admin_users')
    .select('user_id')
    .eq('user_id',user.id)
    .maybeSingle();
 
-  if(error) throw error;
+  if(adminError)throw adminError;
 
-  if(!data){
+  if(!admin){
    message.textContent='هذا الحساب ليس لديه صلاحية الإدارة';
-   await supabase.auth.signOut();
-   location.href='admin.html';
    return false;
   }
 
   return true;
+
  }catch(error){
-  message.textContent='خطأ في التحقق من الإدارة: '+error.message;
+  message.textContent='خطأ التحقق من الحساب: '+error.message;
   return false;
  }
 }
 
 async function loadCountries(){
  const select=$('countrySelect');
-
  select.replaceChildren(new Option('جارٍ تحميل الدول...',''));
 
  const {data,error}=await supabase
@@ -153,7 +153,7 @@ async function loadCountries(){
  if(!data || data.length===0){
   select.replaceChildren(new Option('لا توجد دول',''));
   $('countryCount').textContent='0';
-  message.textContent='جدول الدول فارغ أو لا توجد صلاحية لقراءة البيانات.';
+  message.textContent='لم يتم العثور على دول في قاعدة البيانات.';
   return false;
  }
 
@@ -193,7 +193,7 @@ async function loadData(){
  list.replaceChildren();
 
  if(channels.data.length===0){
-  list.textContent='لا توجد قنوات مسجلة بعد';
+  list.textContent='لا توجد قنوات مسجلة';
  }
 
  channels.data.forEach(c=>{
@@ -289,13 +289,10 @@ $('channelForm').addEventListener('submit',async e=>{
  let result;
 
  if(editingId){
-  result=await supabase
-   .from('channels')
-   .update(values)
-   .eq('id',editingId);
+  result=await supabase.from('channels')
+   .update(values).eq('id',editingId);
  }else{
-  result=await supabase
-   .from('channels')
+  result=await supabase.from('channels')
    .insert({...values,is_published:false});
  }
 
@@ -311,10 +308,8 @@ $('channelForm').addEventListener('submit',async e=>{
 });
 
 async function togglePublish(c){
- const {error}=await supabase
-  .from('channels')
-  .update({is_published:!c.is_published})
-  .eq('id',c.id);
+ const {error}=await supabase.from('channels')
+  .update({is_published:!c.is_published}).eq('id',c.id);
 
  if(error){
   message.textContent='خطأ في النشر: '+error.message;
@@ -328,10 +323,8 @@ async function togglePublish(c){
 async function deleteChannel(c){
  if(!confirm('هل تريد حذف قناة '+c.name+'؟'))return;
 
- const {error}=await supabase
-  .from('channels')
-  .delete()
-  .eq('id',c.id);
+ const {error}=await supabase.from('channels')
+  .delete().eq('id',c.id);
 
  if(error){
   message.textContent='تعذر الحذف: '+error.message;
@@ -381,7 +374,6 @@ function playTest(url){
   });
 
   hls.attachMedia(preview);
-
  }else{
   preview.src=url;
   preview.play().catch(()=>{
