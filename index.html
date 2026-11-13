@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#080b14">
+  <meta name="description" content="واجهة لمشاهدة القنوات التلفزيونية وإدارة المفضلة.">
+  <title>مِشاهِد | قنواتك في مكان واحد</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="مشاهد">
+        <span class="brand-mark">م</span>
+        <span><b>مِشاهِد</b><small>منصتك التلفزيونية</small></span>
+      </a>
+      <div class="side-label">القائمة الرئيسية</div>
+      <button class="nav-item active" data-view="all"><span>▦</span> كل القنوات</button>
+      <button class="nav-item" data-view="favorites"><span>♡</span> المفضلة</button>
+      <button class="nav-item" data-view="recent"><span>◷</span> أضيفت حديثاً</button>
+      <div class="side-label countries-label">الدول</div>
+      <button class="country-link active" data-country="المغرب"><i class="flag">🇲🇦</i> المغرب <em>12</em></button>
+      <button class="country-link" data-country="الجزائر"><i class="flag">🇩🇿</i> الجزائر <em>0</em></button>
+      <button class="country-link" data-country="تونس"><i class="flag">🇹🇳</i> تونس <em>0</em></button>
+      <button class="country-link" data-country="مصر"><i class="flag">🇪🇬</i> مصر <em>0</em></button>
+      <div class="sidebar-bottom">
+        <div class="status-dot"></div><span>واجهة تجريبية جاهزة للتطوير</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="mobile-brand"><span class="brand-mark">م</span><b>مِشاهِد</b></div>
+        <div class="breadcrumb">الرئيسية <span>/</span> <b id="crumb">المغرب</b></div>
+        <div class="top-actions">
+          <label class="search-box"><span>⌕</span><input id="search" type="search" placeholder="ابحث عن قناة..." autocomplete="off"></label>
+          <button class="avatar" title="حساب المستخدم">م</button>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow"><i></i> تجربة المشاهدة الجديدة</span>
+          <h1>كل قنواتك،<br><span>في مكان واحد.</span></h1>
+          <p>اكتشف القنوات حسب البلد، نظّم مفضلتك، واستمتع بواجهة بسيطة وسريعة على هاتفك.</p>
+          <button class="primary-btn" id="browseBtn">استكشف القنوات <span>←</span></button>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="orb orb-one"></div><div class="orb orb-two"></div>
+          <div class="screen-card"><div class="screen-glow">▶</div><div class="screen-lines"></div></div>
+          <span class="float-chip chip-a">بث مباشر</span><span class="float-chip chip-b">HD</span>
+        </div>
+      </section>
+
+      <section class="content-section" id="channelsSection">
+        <div class="section-heading">
+          <div><span class="eyebrow muted">دليل القنوات</span><h2 id="sectionTitle">قنوات المغرب <span class="count" id="count">12</span></h2></div>
+          <div class="filters" role="group" aria-label="تصفية القنوات">
+            <button class="filter active" data-filter="all">الكل</button>
+            <button class="filter" data-filter="general">عامة</button>
+            <button class="filter" data-filter="sports">رياضية</button>
+            <button class="filter" data-filter="culture">ثقافية</button>
+          </div>
+        </div>
+        <div class="channel-grid" id="channelGrid"></div>
+        <div class="empty-state" id="emptyState" hidden>
+          <div>⌕</div><h3>لا توجد قنوات هنا بعد</h3><p>جرّب تغيير البحث أو اختيار دولة أخرى.</p>
+        </div>
+      </section>
+
+      <footer><span>© 2026 مِشاهِد</span><span>نسخة أولية قابلة للتطوير · استخدم روابط البث المرخّصة فقط</span></footer>
+    </main>
+  </div>
+
+  <div class="player-modal" id="playerModal" aria-hidden="true">
+    <div class="player-panel">
+      <div class="player-head"><div><span class="live-pill">● مباشر</span><b id="playerTitle">اسم القناة</b></div><button id="closePlayer" class="close-btn" aria-label="إغلاق">✕</button></div>
+      <div class="video-wrap">
+        <video id="videoPlayer" controls playsinline></video>
+        <div class="video-placeholder" id="videoPlaceholder"><div class="play-symbol">▶</div><h3>مشغّل القناة</h3><p>هذه نسخة تجريبية. أضف رابط بث تملك حق استخدامه في بيانات القناة لتفعيل المشاهدة.</p></div>
+      </div>
+      <div class="player-note">قد تختلف إمكانية التشغيل حسب صيغة البث ودعم المتصفح.</div>
+    </div>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
