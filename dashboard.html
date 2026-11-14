@@ -5,30 +5,119 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>لوحة مِشاهِد TV</title>
+
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#081426;color:#fff;font-family:Arial,sans-serif}
-header{background:#13243a;padding:22px;text-align:center;border-bottom:2px solid #ff9d45}
+
+body{
+ margin:0;
+ background:#081426;
+ color:#fff;
+ font-family:Arial,sans-serif
+}
+
+header{
+ background:#13243a;
+ padding:22px;
+ text-align:center;
+ border-bottom:2px solid #ff9d45
+}
+
 h1{color:#ff9d45;margin:0}
-main{max-width:850px;margin:25px auto;padding:15px}
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px}
-.card,section{background:#13243a;border:1px solid #29415d;padding:20px;border-radius:15px}
+
+main{
+ max-width:850px;
+ margin:25px auto;
+ padding:15px
+}
+
+.cards{
+ display:grid;
+ grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+ gap:14px
+}
+
+.card,section{
+ background:#13243a;
+ border:1px solid #29415d;
+ padding:20px;
+ border-radius:15px
+}
+
 .card{text-align:center}
-.card strong{display:block;font-size:28px;color:#ff9d45}
+
+.card strong{
+ display:block;
+ font-size:28px;
+ color:#ff9d45
+}
+
 section{margin-top:20px}
-input,button{width:100%;padding:13px;margin:8px 0;border-radius:9px;font-size:15px}
-input{background:#081426;color:white;border:1px solid #40536b}
-button{background:#ff9d45;color:#211307;border:0;font-weight:bold;cursor:pointer}
-.item{padding:14px 0;border-bottom:1px solid #40536b;overflow-wrap:anywhere}
-.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-.actions button{font-size:13px;padding:10px}
+
+input,button{
+ width:100%;
+ padding:13px;
+ margin:8px 0;
+ border-radius:9px;
+ font-size:15px
+}
+
+input{
+ background:#081426;
+ color:white;
+ border:1px solid #40536b
+}
+
+button{
+ background:#ff9d45;
+ color:#211307;
+ border:0;
+ font-weight:bold;
+ cursor:pointer
+}
+
+button:disabled{
+ opacity:.5;
+ cursor:not-allowed
+}
+
+.item{
+ padding:14px 0;
+ border-bottom:1px solid #40536b;
+ overflow-wrap:anywhere
+}
+
+.actions{
+ display:grid;
+ grid-template-columns:repeat(2,1fr);
+ gap:6px
+}
+
+.actions button{
+ font-size:13px;
+ padding:10px
+}
+
 .danger{background:#a83232;color:white}
 .secondary{background:#40536b;color:white}
-#message{color:#ffbd75;white-space:pre-wrap;line-height:1.7}
-video{width:100%;background:#000;border-radius:10px;margin-top:10px}
+
+#message{
+ color:#ffbd75;
+ white-space:pre-wrap;
+ line-height:1.7
+}
+
+video{
+ width:100%;
+ background:#000;
+ border-radius:10px;
+ margin-top:10px
+}
+
 .hidden{display:none}
 </style>
 </head>
+
 <body>
 
 <header>
@@ -39,21 +128,29 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 <main>
 
 <div class="cards">
-<div class="card">القنوات<strong id="channelCount">0</strong></div>
-<div class="card">المباريات<strong id="matchCount">0</strong></div>
+ <div class="card">القنوات<strong id="channelCount">0</strong></div>
+ <div class="card">المباريات<strong id="matchCount">0</strong></div>
 </div>
 
 <section>
 <h2 id="formTitle">إضافة قناة</h2>
 
 <form id="channelForm">
+
 <input id="channelName" placeholder="اسم القناة" required>
+
 <input id="logo" type="url" placeholder="رابط شعار القناة (اختياري)">
+
 <input id="stream" type="url" placeholder="رابط البث المرخّص">
+
 <input id="category" placeholder="التصنيف">
 
 <button id="saveButton" type="submit">حفظ القناة</button>
-<button type="button" class="secondary hidden" id="cancelEdit">إلغاء التعديل</button>
+
+<button type="button" class="secondary hidden" id="cancelEdit">
+إلغاء التعديل
+</button>
+
 </form>
 </section>
 
@@ -78,15 +175,18 @@ video{width:100%;background:#000;border-radius:10px;margin-top:10px}
 </main>
 
 <script type="module">
+
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2';
 import Hls from 'https://esm.sh/hls.js@1.5.17';
 
 const SUPABASE_URL='https://irkjsubiecrbhladkdko.supabase.co';
+
 const SUPABASE_KEY='sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc';
 
 const supabase=createClient(SUPABASE_URL,SUPABASE_KEY);
 
 const $=id=>document.getElementById(id);
+
 const message=$('message');
 const list=$('channelsList');
 const preview=$('preview');
@@ -94,9 +194,15 @@ const preview=$('preview');
 let editingId=null;
 let hls=null;
 
+
+// التحقق من حساب المدير
+
 async function checkAdmin(){
+
  try{
+
   const {data,error}=await supabase.auth.getUser();
+
   if(error)throw error;
 
   const user=data.user;
@@ -120,82 +226,112 @@ async function checkAdmin(){
   }
 
   return true;
+
  }catch(error){
+
   message.textContent='خطأ التحقق من الحساب: '+error.message;
+
   return false;
  }
+
 }
+
+
+// تحميل القنوات والمباريات
 
 async function loadData(){
+
  message.textContent='جارٍ تحميل البيانات...';
 
- const [channels,matches]=await Promise.all([
-  supabase.from('channels').select('*').order('created_at',{ascending:false}),
-  supabase.from('matches').select('*')
- ]);
+ try{
 
- if(channels.error){
-  message.textContent='خطأ تحميل القنوات: '+channels.error.message;
-  return;
+  const [channels,matches]=await Promise.all([
+
+   supabase
+    .from('channels')
+    .select('*')
+    .order('created_at',{ascending:false}),
+
+   supabase
+    .from('matches')
+    .select('*')
+
+  ]);
+
+  if(channels.error)throw channels.error;
+
+  if(matches.error)throw matches.error;
+
+  $('channelCount').textContent=channels.data.length;
+
+  $('matchCount').textContent=matches.data.length;
+
+  list.replaceChildren();
+
+  if(channels.data.length===0){
+
+   list.textContent='لا توجد قنوات مسجلة';
+
+  }
+
+  channels.data.forEach(c=>{
+
+   const item=document.createElement('div');
+   item.className='item';
+
+   const title=document.createElement('strong');
+   title.textContent=c.name;
+
+   const status=document.createElement('p');
+   status.textContent=c.is_published?'منشورة':'مسودة';
+
+   const link=document.createElement('small');
+   link.textContent=c.stream_url||'لا يوجد رابط بث';
+
+   const actions=document.createElement('div');
+   actions.className='actions';
+
+   const edit=document.createElement('button');
+   edit.textContent='تعديل';
+   edit.onclick=()=>editChannel(c);
+
+   const test=document.createElement('button');
+   test.textContent='اختبار البث';
+   test.className='secondary';
+   test.onclick=()=>playTest(c.stream_url);
+
+   const publish=document.createElement('button');
+   publish.textContent=c.is_published?'إلغاء النشر':'نشر القناة';
+   publish.onclick=()=>togglePublish(c);
+
+   const remove=document.createElement('button');
+   remove.textContent='حذف';
+   remove.className='danger';
+   remove.onclick=()=>deleteChannel(c);
+
+   actions.append(edit,test,publish,remove);
+
+   item.append(title,status,link,actions);
+
+   list.append(item);
+
+  });
+
+  message.textContent='تم تحميل البيانات بنجاح';
+
+ }catch(error){
+
+  message.textContent='خطأ تحميل البيانات: '+error.message;
+
  }
 
- if(matches.error){
-  message.textContent='خطأ تحميل المباريات: '+matches.error.message;
-  return;
- }
-
- $('channelCount').textContent=channels.data.length;
- $('matchCount').textContent=matches.data.length;
-
- list.replaceChildren();
-
- if(channels.data.length===0){
-  list.textContent='لا توجد قنوات مسجلة';
- }
-
- channels.data.forEach(c=>{
-  const item=document.createElement('div');
-  item.className='item';
-
-  const title=document.createElement('strong');
-  title.textContent=c.name;
-
-  const status=document.createElement('p');
-  status.textContent=c.is_published?'منشورة':'مسودة';
-
-  const link=document.createElement('small');
-  link.textContent=c.stream_url||'لا يوجد رابط بث';
-
-  const actions=document.createElement('div');
-  actions.className='actions';
-
-  const edit=document.createElement('button');
-  edit.textContent='تعديل';
-  edit.onclick=()=>editChannel(c);
-
-  const test=document.createElement('button');
-  test.textContent='اختبار البث';
-  test.className='secondary';
-  test.onclick=()=>playTest(c.stream_url);
-
-  const publish=document.createElement('button');
-  publish.textContent=c.is_published?'إلغاء النشر':'نشر القناة';
-  publish.onclick=()=>togglePublish(c);
-
-  const remove=document.createElement('button');
-  remove.textContent='حذف';
-  remove.className='danger';
-  remove.onclick=()=>deleteChannel(c);
-
-  actions.append(edit,test,publish,remove);
-  item.append(title,status,link,actions);
-  list.append(item);
- });
-
- message.textContent='تم تحميل البيانات بنجاح';
 }
 
+
+// تعديل قناة
+
 function editChannel(c){
+
  editingId=c.id;
 
  $('channelName').value=c.name||'';
@@ -204,213 +340,283 @@ function editChannel(c){
  $('category').value=c.category||'';
 
  $('formTitle').textContent='تعديل القناة';
+
  $('saveButton').textContent='حفظ التعديلات';
+
  $('cancelEdit').classList.remove('hidden');
 
  window.scrollTo({top:0,behavior:'smooth'});
+
 }
 
+
+// إعادة النموذج
+
 function resetForm(){
+
  editingId=null;
+
  $('channelForm').reset();
+
  $('formTitle').textContent='إضافة قناة';
+
  $('saveButton').textContent='حفظ القناة';
+
  $('cancelEdit').classList.add('hidden');
+
 }
 
 $('cancelEdit').onclick=resetForm;
 
 
-$('channelForm').addEventListener('submit', async e => {
+// حفظ وإضافة القنوات
+
+$('channelForm').addEventListener('submit',async e=>{
+
  e.preventDefault();
 
- const saveButton = $('saveButton');
- saveButton.disabled = true;
- 
- };
+ const saveButton=$('saveButton');
 
- if (!values.name) {
-  message.textContent = 'يرجى إدخال اسم القناة';
-  saveButton.disabled = false;
-  return;
- }
-
- const wasEditing = editingId !== null;
-
- try {
-  let result;
-
-  if (wasEditing) {
-   result = await supabase
-    .from('channels')
-    .update(values)
-    .eq('id', editingId)
-    .select()
-    .single();
-  } else {
-   result = await supabase
-    .from('channels')
-    .insert({
-     ...values,
-     is_published: false
-    })
-    .select()
-    .single();
-  }
-
-  if (result.error) {
-   throw result.error;
-  }
-
-  if (!result.data) {
-   throw new Error('لم يتم تأكيد حفظ القناة في قاعدة البيانات');
-  }
-
-  resetForm();
-
-await loadData();
-
-message.textContent = wasEditing
- ? 'تم تحديث القناة بنجاح'
- : 'تم حفظ القناة بنجاح كمسودة. يمكنك الآن نشرها.';
-
- } catch (error) {
-  console.error('Channel save error:', error);
-
-  message.textContent =
-   'فشل حفظ القناة:\n' +
-   (error.message || 'خطأ غير معروف');
-
- } finally {
-  saveButton.disabled = false;
- }
-});
-
+ saveButton.disabled=true;
 
  message.textContent='جارٍ حفظ القناة...';
 
  const values={
+
   name:$('channelName').value.trim(),
+
   logo_url:$('logo').value.trim()||null,
+
   stream_url:$('stream').value.trim()||null,
+
   category:$('category').value.trim()||null
+
  };
+
+ if(!values.name){
+
+  message.textContent='يرجى إدخال اسم القناة';
+
+  saveButton.disabled=false;
+
+  return;
+
+ }
 
  const wasEditing=editingId!==null;
 
- let result;
-
  try{
+
+  let result;
+
   if(wasEditing){
-   result=await supabase.from('channels')
-    .update(values).eq('id',editingId);
+
+   result=await supabase
+    .from('channels')
+    .update(values)
+    .eq('id',editingId)
+    .select()
+    .single();
+
   }else{
-   result=await supabase.from('channels')
-    .insert({...values,is_published:false});
+
+   result=await supabase
+    .from('channels')
+    .insert({
+     ...values,
+     is_published:false
+    })
+    .select()
+    .single();
+
   }
 
-  if(result.error){
-   message.textContent='تعذر الحفظ: '+result.error.message;
-   return;
+  if(result.error)throw result.error;
+
+  if(!result.data){
+
+   throw new Error('لم يتم تأكيد حفظ القناة في قاعدة البيانات');
+
   }
 
   resetForm();
+
   await loadData();
 
   message.textContent=wasEditing
    ?'تم تحديث القناة بنجاح'
-   :'تمت إضافة القناة كمسودة بنجاح. اضغط نشر لتظهر في التطبيق.';
+   :'تمت إضافة القناة بنجاح كمسودة. يمكنك الآن نشرها.';
 
  }catch(error){
-  message.textContent='حدث خطأ: '+error.message;
+
+  console.error('Channel save error:',error);
+
+  message.textContent='فشل حفظ القناة:\n'+error.message;
+
+ }finally{
+
+  saveButton.disabled=false;
+
  }
+
 });
 
+
+// نشر القناة أو إلغاء النشر
+
 async function togglePublish(c){
- const {error}=await supabase.from('channels')
-  .update({is_published:!c.is_published}).eq('id',c.id);
+
+ const {error}=await supabase
+  .from('channels')
+  .update({is_published:!c.is_published})
+  .eq('id',c.id);
 
  if(error){
+
   message.textContent='خطأ في النشر: '+error.message;
+
   return;
+
  }
 
  await loadData();
- message.textContent=c.is_published?'تم إلغاء النشر':'تم نشر القناة';
+
+ message.textContent=c.is_published
+  ?'تم إلغاء النشر'
+  :'تم نشر القناة';
+
 }
+
+
+// حذف القناة
 
 async function deleteChannel(c){
+
  if(!confirm('هل تريد حذف قناة '+c.name+'؟'))return;
 
- const {error}=await supabase.from('channels')
-  .delete().eq('id',c.id);
+ const {error}=await supabase
+  .from('channels')
+  .delete()
+  .eq('id',c.id);
 
  if(error){
+
   message.textContent='تعذر الحذف: '+error.message;
+
   return;
+
  }
 
  await loadData();
+
  message.textContent='تم حذف القناة';
+
 }
 
+
+// إيقاف اختبار البث
+
 function stopPreview(){
+
  if(hls){
+
   hls.destroy();
+
   hls=null;
+
  }
 
  preview.pause();
+
  preview.removeAttribute('src');
+
  preview.load();
+
 }
 
+
+// اختبار البث
+
 function playTest(url){
+
  if(!url){
+
   message.textContent='لا يوجد رابط بث لهذه القناة';
+
   return;
+
  }
 
  stopPreview();
 
- if(url.toLowerCase().includes('.m3u8') && Hls.isSupported()){
+ if(url.toLowerCase().includes('.m3u8')&&Hls.isSupported()){
+
   hls=new Hls();
 
   hls.on(Hls.Events.MEDIA_ATTACHED,()=>{
+
    hls.loadSource(url);
+
   });
 
   hls.on(Hls.Events.MANIFEST_PARSED,()=>{
+
    preview.play().catch(()=>{
+
     message.textContent='اضغط زر التشغيل داخل المشغل';
+
    });
+
   });
 
   hls.on(Hls.Events.ERROR,(event,data)=>{
+
    if(data.fatal){
+
     message.textContent='تعذر تشغيل البث. تحقق من الرابط أو صلاحيات CORS.';
+
    }
+
   });
 
   hls.attachMedia(preview);
+
  }else{
+
   preview.src=url;
+
   preview.play().catch(()=>{
+
    message.textContent='اضغط زر التشغيل داخل المشغل أو تحقق من الرابط';
+
   });
+
  }
+
 }
 
 $('stopPreview').onclick=stopPreview;
 
+
+// تسجيل الخروج
+
 $('logout').onclick=async()=>{
+
  await supabase.auth.signOut();
+
  location.href='admin.html';
+
 };
 
+
+// تشغيل لوحة الإدارة
+
 if(await checkAdmin()){
+
  await loadData();
+
 }
+
 </script>
 
 </body>
