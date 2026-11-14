@@ -330,11 +330,20 @@ async function loadPublishedChannels() {
    }
   );
 
+  // قراءة نتيجة الاختبار وعرضها
+  const responseText = await response.text();
+
+  alert(
+   "اختبار اتصال Supabase\n" +
+   "رمز الاستجابة: " + response.status + "\n\n" +
+   "النتيجة:\n" + responseText
+  );
+
   if (!response.ok) {
-   throw new Error("خطأ Supabase: " + await response.text());
+   throw new Error("خطأ Supabase: " + responseText);
   }
 
-  const rows = await response.json();
+  const rows = JSON.parse(responseText);
 
   rows.forEach(row => {
    const name = (row.name || "").trim().toLowerCase();
@@ -387,7 +396,7 @@ async function loadPublishedChannels() {
 render();
 loadPublishedChannels();
 
-// إلغاء تسجيل Service Worker القديم لتجنب عرض نسخة مخزنة
+// إلغاء تسجيل Service Worker القديم
 if ("serviceWorker" in navigator) {
  navigator.serviceWorker.getRegistrations().then(registrations => {
   registrations.forEach(registration => registration.unregister());
