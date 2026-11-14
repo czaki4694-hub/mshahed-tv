@@ -220,8 +220,78 @@ function resetForm(){
 
 $('cancelEdit').onclick=resetForm;
 
-$('channelForm').addEventListener('submit',async e=>{
+
+$('channelForm').addEventListener('submit', async e => {
  e.preventDefault();
+
+ const saveButton = $('saveButton');
+ saveButton.disabled = true;
+ message.textContent = 'جارٍ حفظ القناة...';
+
+ const values = {
+  name: $('channelName').value.trim(),
+  logo_url: $('logo').value.trim() || null,
+  stream_url: $('stream').value.trim() || null,
+  category: $('category').value.trim() || null
+ };
+
+ if (!values.name) {
+  message.textContent = 'يرجى إدخال اسم القناة';
+  saveButton.disabled = false;
+  return;
+ }
+
+ const wasEditing = editingId !== null;
+
+ try {
+  let result;
+
+  if (wasEditing) {
+   result = await supabase
+    .from('channels')
+    .update(values)
+    .eq('id', editingId)
+    .select()
+    .single();
+  } else {
+   result = await supabase
+    .from('channels')
+    .insert({
+     ...values,
+     is_published: false
+    })
+    .select()
+    .single();
+  }
+
+  if (result.error) {
+   throw result.error;
+  }
+
+  if (!result.data) {
+   throw new Error('لم يتم تأكيد حفظ القناة في قاعدة البيانات');
+  }
+
+  resetForm();
+
+  message.textContent = wasEditing
+   ? 'تم تحديث القناة بنجاح'
+   : 'تم حفظ القناة بنجاح كمسودة. يمكنك الآن نشرها.';
+
+  await loadData();
+
+ } catch (error) {
+  console.error('Channel save error:', error);
+
+  message.textContent =
+   'فشل حفظ القناة:\n' +
+   (error.message || 'خطأ غير معروف');
+
+ } finally {
+  saveButton.disabled = false;
+ }
+});
+
 
  message.textContent='جارٍ حفظ القناة...';
 
