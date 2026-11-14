@@ -226,13 +226,7 @@ $('channelForm').addEventListener('submit', async e => {
 
  const saveButton = $('saveButton');
  saveButton.disabled = true;
- message.textContent = 'جارٍ حفظ القناة...';
-
- const values = {
-  name: $('channelName').value.trim(),
-  logo_url: $('logo').value.trim() || null,
-  stream_url: $('stream').value.trim() || null,
-  category: $('category').value.trim() || null
+ 
  };
 
  if (!values.name) {
@@ -274,11 +268,11 @@ $('channelForm').addEventListener('submit', async e => {
 
   resetForm();
 
-  message.textContent = wasEditing
-   ? 'تم تحديث القناة بنجاح'
-   : 'تم حفظ القناة بنجاح كمسودة. يمكنك الآن نشرها.';
+await loadData();
 
-  await loadData();
+message.textContent = wasEditing
+ ? 'تم تحديث القناة بنجاح'
+ : 'تم حفظ القناة بنجاح كمسودة. يمكنك الآن نشرها.';
 
  } catch (error) {
   console.error('Channel save error:', error);
