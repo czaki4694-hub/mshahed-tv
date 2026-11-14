@@ -39,7 +39,6 @@ document.querySelectorAll("[data-country]").forEach(button => {
  else button.hidden = true;
 });
 
-// إخفاء العناصر المعروفة الخاصة بقائمة الدول
 [
  "#countriesSection",
  "#countrySection",
@@ -321,23 +320,28 @@ const SUPABASE_KEY = "sb_publishable_-wc1SLRAQm_pZLzLExy-Aw_j0kxFdjc";
 async function loadPublishedChannels() {
  try {
   const response = await fetch(
-   `${SUPABASE_URL}/rest/v1/channels?select=id,name,logo_url,stream_url,category,is_published,country_id&is_published=eq.true`,
+   `${SUPABASE_URL}/rest/v1/channels?select=id,name,logo_url,stream_url,category,is_published&is_published=eq.true&order=created_at.desc`,
    {
     headers: {
      apikey: SUPABASE_KEY,
      Authorization: `Bearer ${SUPABASE_KEY}`
-    }
+    },
+    cache: "no-store"
    }
   );
 
-  if (!response.ok) throw new Error(await response.text());
+  if (!response.ok) {
+   throw new Error("خطأ Supabase: " + await response.text());
+  }
 
   const rows = await response.json();
 
   rows.forEach(row => {
    const name = (row.name || "").trim().toLowerCase();
 
-   // منع تكرار القناة إذا كانت موجودة مسبقاً
+   if (!name) return;
+
+   // منع تكرار القنوات بالاسم
    const existing = channels.find(c =>
     c.name.trim().toLowerCase() === name
    );
@@ -351,10 +355,12 @@ async function loadPublishedChannels() {
    const categoryText = (row.category || "").toLowerCase();
 
    let category = "general";
-   if (categoryText.includes("رياض") || categoryText.includes("sport"))
+
+   if (categoryText.includes("رياض") || categoryText.includes("sport")) {
     category = "sports";
-   else if (categoryText.includes("ثقاف") || categoryText.includes("culture"))
+   } else if (categoryText.includes("ثقاف") || categoryText.includes("culture")) {
     category = "culture";
+   }
 
    channels.push({
     id: "db-" + row.id,
@@ -370,14 +376,20 @@ async function loadPublishedChannels() {
 
   render();
 
+  console.log("تم تحميل القنوات المنشورة:", rows.length);
+
  } catch (error) {
   console.error("خطأ تحميل القنوات:", error);
+  toast("تعذر تحميل القنوات من قاعدة البيانات");
  }
 }
 
 render();
 loadPublishedChannels();
 
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
- navigator.serviceWorker.register("./sw.js").catch(() => {});
+// إلغاء تسجيل Service Worker القديم لتجنب عرض نسخة مخزنة
+if ("serviceWorker" in navigator) {
+ navigator.serviceWorker.getRegistrations().then(registrations => {
+  registrations.forEach(registration => registration.unregister());
+ });
 }
